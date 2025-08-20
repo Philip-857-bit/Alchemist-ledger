@@ -7,7 +7,7 @@
 ---
 
 ## ✨ Features
-
+* **Gasless Player Experience**: Players can enjoy the game without needing to approve transactions or pay gas fees for in-game actions. All on-chain interactions are sponsored by the game's backend, providing a smooth Web2-like feel.
 * **On-Chain Integration**: Player scores and transaction counts are submitted to the Monad Games ID smart contract, contributing to a global leaderboard.
 * **Persistent Progress**: Player inventory, discovered recipes, and unlocked achievements are saved in the browser's `localStorage`.
 * **Timed Resource Generation**: Basic elements are a scarce resource, regenerating over time to encourage strategic play and return visits.
