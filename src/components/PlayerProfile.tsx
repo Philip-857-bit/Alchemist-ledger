@@ -1,4 +1,3 @@
-// components/PlayerProfile.tsx
 "use client";
 
 import { usePrivy, CrossAppAccountWithMetadata } from '@privy-io/react-auth';
