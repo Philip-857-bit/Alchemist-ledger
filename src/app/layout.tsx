@@ -8,8 +8,8 @@ import { Toaster } from "react-hot-toast"; // Import the Toaster
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Monad Game",
-  description: "Our entry for the Monad Game Jam",
+  title: "The Alchemist's Ledger",
+  description: "A game for alchemy and discoveries",
 };
 
 export default function RootLayout({
