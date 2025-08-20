@@ -18,10 +18,11 @@ const monadTestnet = {
 
 const contractAddress = "0xceCBFF203C8B6044F52CE23D914A1bfD997541A4";
 
-// Set up the read-only public client
+// Set up the read-only public client (disable multicall batching)
 const publicClient = createPublicClient({
   chain: monadTestnet,
   transport: http(),
+  batch: { multicall: false },
 });
 
 // Helper function to determine rank & thresholds
@@ -44,7 +45,6 @@ const getRankFromScore = (score: bigint): string => {
   return "Novice";
 };
 
-// Dynamic colors per rank
 const rankColors: Record<string, string> = {
   Novice: "text-gray-400",
   Apprentice: "text-green-400",
@@ -68,29 +68,23 @@ export default function Leaderboard({ playerAddress }: LeaderboardProps) {
 
   const rank = score !== null ? getRankFromScore(score) : "Novice";
 
-  // Format numbers
   const formatNum = (n: bigint | null) =>
     n !== null ? new Intl.NumberFormat().format(Number(n)) : "0";
 
-  // Shorten address
   const shortAddress = (addr: string) =>
     addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : "";
 
-  // Calculate progress toward next rank
   const progressPercent = (() => {
     if (score === null) return 0;
     const scoreNum = Number(score);
-    const currentRankIndex = rankThresholds.findIndex(
-      (r) => r.rank === rank
-    );
+    const currentRankIndex = rankThresholds.findIndex((r) => r.rank === rank);
     const currentThreshold = rankThresholds[currentRankIndex].threshold;
     const nextThreshold =
       currentRankIndex > 0
         ? rankThresholds[currentRankIndex - 1].threshold
         : currentThreshold;
     const progress =
-      ((scoreNum - currentThreshold) / (nextThreshold - currentThreshold)) *
-      100;
+      ((scoreNum - currentThreshold) / (nextThreshold - currentThreshold)) * 100;
     return Math.max(0, Math.min(100, progress));
   })();
 
@@ -101,25 +95,24 @@ export default function Leaderboard({ playerAddress }: LeaderboardProps) {
       setIsLoading(true);
       setError(null);
       try {
-        const results = await publicClient.multicall({
-          contracts: [
-            {
-              address: contractAddress,
-              abi: contractAbi,
-              functionName: "totalScoreOfPlayer",
-              args: [playerAddress as `0x${string}`],
-            },
-            {
-              address: contractAddress,
-              abi: contractAbi,
-              functionName: "totalTransactionsOfPlayer",
-              args: [playerAddress as `0x${string}`],
-            },
-          ],
-        });
+        // ✅ No multicall — do two parallel readContract calls
+        const [totalScore, totalTxs] = await Promise.all([
+          publicClient.readContract({
+            address: contractAddress,
+            abi: contractAbi,
+            functionName: "totalScoreOfPlayer",
+            args: [playerAddress as `0x${string}`],
+          }),
+          publicClient.readContract({
+            address: contractAddress,
+            abi: contractAbi,
+            functionName: "totalTransactionsOfPlayer",
+            args: [playerAddress as `0x${string}`],
+          }),
+        ]);
 
-        setScore(results[0].result as bigint);
-        setTransactions(results[1].result as bigint);
+        setScore(totalScore as bigint);
+        setTransactions(totalTxs as bigint);
       } catch (err) {
         console.error("Failed to fetch score:", err);
         setError("⚠️ Could not load leaderboard data.");
@@ -131,13 +124,8 @@ export default function Leaderboard({ playerAddress }: LeaderboardProps) {
     fetchData();
   }, [playerAddress]);
 
-  if (isLoading) {
-    return <div className="text-center text-gray-400">Loading Score...</div>;
-  }
-
-  if (error) {
-    return <div className="text-center text-red-400">{error}</div>;
-  }
+  if (isLoading) return <div className="text-center text-gray-400">Loading Score...</div>;
+  if (error) return <div className="text-center text-red-400">{error}</div>;
 
   return (
     <div className="w-full max-w-4xl mt-4 bg-gray-800 p-4 sm:p-6 rounded-lg">
@@ -151,20 +139,12 @@ export default function Leaderboard({ playerAddress }: LeaderboardProps) {
 
       <div className="text-center mb-4">
         <p className="text-gray-400 text-xs sm:text-sm uppercase">Rank</p>
-        <p
-          className={`text-2xl sm:text-3xl font-bold ${
-            rankColors[rank] || "text-white"
-          }`}
-        >
+        <p className={`text-2xl sm:text-3xl font-bold ${rankColors[rank] || "text-white"}`}>
           {rank}
         </p>
 
-        {/* Progress bar toward next rank */}
         <div className="w-full bg-gray-700 h-2 rounded mt-2">
-          <div
-            className="bg-yellow-400 h-2 rounded"
-            style={{ width: `${progressPercent}%` }}
-          />
+          <div className="h-2 rounded bg-yellow-400" style={{ width: `${progressPercent}%` }} />
         </div>
         <p className="text-gray-400 text-xs mt-1">
           Progress to next rank: {progressPercent.toFixed(0)}%
@@ -173,15 +153,11 @@ export default function Leaderboard({ playerAddress }: LeaderboardProps) {
 
       <div className="flex flex-col sm:flex-row justify-around text-center border-t border-gray-700 pt-4 gap-4 sm:gap-0">
         <div>
-          <p className="text-2xl sm:text-3xl font-bold text-purple-400">
-            {formatNum(score)}
-          </p>
+          <p className="text-2xl sm:text-3xl font-bold text-purple-400">{formatNum(score)}</p>
           <p className="text-gray-400 text-sm">Points</p>
         </div>
         <div>
-          <p className="text-2xl sm:text-3xl font-bold text-purple-400">
-            {formatNum(transactions)}
-          </p>
+          <p className="text-2xl sm:text-3xl font-bold text-purple-400">{formatNum(transactions)}</p>
           <p className="text-gray-400 text-sm">Transactions</p>
         </div>
       </div>
